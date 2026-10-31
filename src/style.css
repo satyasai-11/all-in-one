@@ -22,3 +22,14 @@
 .planner-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}.home-events{margin-top:14px}.vault-locked{min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#7e8177}.vault-locked h2{color:#3f443b;font-size:18px;margin-top:13px}.vault-locked p{font-size:11px;margin:8px 0 18px}@media(max-width:760px){.planner-grid{grid-template-columns:1fr}}
 
 .storage-status-screen{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:13px;padding:24px;text-align:center;color:#6e7569}.storage-status-screen h1{color:#32382f;font-size:22px}.storage-status-screen p{max-width:440px;line-height:1.6}.sidebar{overflow-y:auto}.import-backup input{font-size:0;position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}.import-backup{position:relative}.home-items,.planner-grid .panel{min-width:0}@media(max-width:760px){.sidebar{padding-bottom:20px}.sidebar-bottom{padding-top:16px}.storage-status-screen{padding:18px}}
+
+.cashflow-toolbar{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin:4px 0 16px}
+.month-year-picker{display:flex;align-items:flex-end;gap:10px;min-width:0}
+.month-picker{display:flex;flex-direction:column;gap:6px;color:#62665d;font-size:11px;font-weight:600;min-width:0}
+.month-picker select{height:40px;min-width:148px;padding:0 34px 0 11px;border:1px solid #dfe1d9;border-radius:8px;background:#fff;color:#34372f;font-size:13px;outline:none}
+.month-picker select:focus{border-color:#819277;box-shadow:0 0 0 3px #edf1e9}
+.month-picker:last-child select{min-width:108px}
+.cashflow-actions{display:flex;gap:8px;flex-wrap:wrap}
+@media(max-width:760px){.cashflow-toolbar{align-items:stretch;gap:12px}.month-year-picker{display:grid;grid-template-columns:minmax(0,1fr) minmax(100px,.72fr);width:100%;gap:9px}.month-picker select,.month-picker:last-child select{width:100%;min-width:0}.cashflow-actions{width:100%}.cashflow-actions .button{flex:1}}
+.sidebar-backdrop{display:none}
+@media(max-width:760px){.sidebar-backdrop{display:block;position:fixed;inset:0;z-index:9;width:100%;height:100%;border:0;background:#20261f66;cursor:default}}

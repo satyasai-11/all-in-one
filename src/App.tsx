@@ -37,7 +37,10 @@ async function makePinCredential(pin: string): Promise<PinCredential> {
 }
 
 function App() {
-  const [page, setPage] = useState<Page>('Home');
+  const [page, setPage] = useState<Page>(() => {
+    const saved = sessionStorage.getItem('mai-current-page');
+    return pages.includes(saved as Page) ? saved as Page : 'Home';
+  });
   const [data, setData] = useState<Store>(initial);
   const [storageReady, setStorageReady] = useState(false);
   const [storageError, setStorageError] = useState('');
@@ -55,15 +58,6 @@ function App() {
   const [profileName, setProfileName] = useState(() => localStorage.getItem('mai-profile-name') || '');
   const [profileDialogOpen, setProfileDialogOpen] = useState(() => !localStorage.getItem('mai-profile-name'));
   const [selectedMonth, setSelectedMonth] = useState(monthNow);
-  const [removedCashflowYears, setRemovedCashflowYears] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('mai-cashflow-removed-years') || '[]') as string[]; } catch { return []; } });
-  const [cashflowYears, setCashflowYears] = useState<string[]>(() => {
-    try {
-      const raw = localStorage.getItem('mai-cashflow-years');
-      const saved = raw ? JSON.parse(raw) as string[] : defaultYears;
-      const removed = JSON.parse(localStorage.getItem('mai-cashflow-removed-years') || '[]') as string[];
-      return [...new Set([...defaultYears, ...saved.filter(year => Number(year) >= currentYear)])].filter(year => !removed.includes(year)).sort();
-    } catch { return defaultYears; }
-  });
   const [flowFilter, setFlowFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [balanceTab, setBalanceTab] = useState<'Assets' | 'Liabilities'>('Assets');
   const privateMode = !lockEnabled[page] || unlockedSections[page];
@@ -93,8 +87,7 @@ function App() {
     return () => { active = false; };
   }, []);
   useEffect(() => { if (storageReady) void writeDeviceRecords(data).catch(error => { setNoticeError(true); setNotice(error instanceof Error ? error.message : 'Could not save to on-device storage. Download a backup before leaving this page.'); }); }, [data, storageReady]);
-  useEffect(() => { localStorage.setItem('mai-cashflow-years', JSON.stringify(cashflowYears)); }, [cashflowYears]);
-  useEffect(() => { localStorage.setItem('mai-cashflow-removed-years', JSON.stringify(removedCashflowYears)); }, [removedCashflowYears]);
+  useEffect(() => { sessionStorage.setItem('mai-current-page', page); }, [page]);
   useEffect(() => { localStorage.setItem('mai-section-locks', JSON.stringify(lockEnabled)); }, [lockEnabled]);
   useEffect(() => { if (pinCredential) localStorage.setItem('mai-pin-credential', JSON.stringify(pinCredential)); }, [pinCredential]);
   useEffect(() => { if (profileName) localStorage.setItem('mai-profile-name', profileName); }, [profileName]);
@@ -140,19 +133,9 @@ function App() {
     setUnlockedSections(current => ({ ...current, [section]: false }));
     if (section === 'Personal vault') { setVaultPreview(null); setModalKind(''); setEditing(null); }
   };
-  const selectedYear = selectedMonth.slice(0, 4);
   const yearHasCashflowData = (year: string) => data.transactions.some(item => item.date?.startsWith(`${year}-`)) || data.recurringTemplates.some(item => item.periods.some(period => period.startMonth <= `${year}-12` && (!period.endMonth || period.endMonth >= `${year}-01`)));
   const historicYears = Array.from({ length: Math.max(0, currentYear - 1900) }, (_, index) => String(1900 + index)).filter(yearHasCashflowData);
-  const visibleCashflowYears = [...new Set([...cashflowYears, ...historicYears])].sort();
-  const addCashflowYear = () => {
-    const entered = String(Math.max(...visibleCashflowYears.map(Number), currentYear - 1) + 1);
-    const next = [...new Set([...cashflowYears, entered])].sort(); setCashflowYears(next); setRemovedCashflowYears(current => current.filter(year => year !== entered)); setSelectedMonth(`${entered}-01`); setNoticeError(false); setNotice(`Added ${entered}.`);
-  };
-  const removeCashflowYear = () => {
-    if (Number(selectedYear) === currentYear) { setNoticeError(true); setNotice('The current year cannot be removed.'); return; }
-    if (yearHasCashflowData(selectedYear)) { setNoticeError(true); setNotice(`${selectedYear} has cash-flow data and cannot be removed.`); return; }
-    const next = cashflowYears.filter(year => year !== selectedYear); setCashflowYears(next); setRemovedCashflowYears(current => [...new Set([...current, selectedYear])]); setSelectedMonth(`${currentYear}-01`); setNoticeError(false); setNotice(`${selectedYear} removed.`);
-  };
+  const visibleCashflowYears = [...new Set([...defaultYears, ...historicYears])].sort();
 
   const recordFor = (target: EditTarget): Entry | undefined => {
     if (!target) return undefined;
@@ -277,7 +260,7 @@ function App() {
     })] : [...item.periods, { startMonth: nextMonth(monthNow) }];
     return { ...item, periods };
   }) });
-  const exportJson = () => { const backup = { app: 'All In One', version: 1, exportedAt: new Date().toISOString(), profileName, data, cashflowYears, removedCashflowYears, lockEnabled }; const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'all-in-one-backup.json'; link.click(); window.setTimeout(() => URL.revokeObjectURL(link.href), 1500); };
+  const exportJson = () => { const backup = { app: 'All In One', version: 1, exportedAt: new Date().toISOString(), profileName, data, lockEnabled }; const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'all-in-one-backup.json'; link.click(); window.setTimeout(() => URL.revokeObjectURL(link.href), 1500); };
   const importBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -303,8 +286,6 @@ function App() {
       if (!requiredCollections.every(key => Array.isArray(parsed[key]))) throw new Error('This file is not a valid All In One Excel or JSON backup.');
       if (!window.confirm('Replace the data saved in this browser with the selected backup?')) return;
       setData({ ...initial, ...parsed, otherInfo: Array.isArray(parsed.otherInfo) ? parsed.otherInfo : [] } as Store);
-      if (Array.isArray(backup.cashflowYears)) setCashflowYears([...new Set([...defaultYears, ...backup.cashflowYears.filter(year => Number(year) >= currentYear)])].filter(year => !backup.removedCashflowYears?.includes(year)).sort());
-      if (Array.isArray(backup.removedCashflowYears)) setRemovedCashflowYears(backup.removedCashflowYears);
       if (backup.lockEnabled) setLockEnabled(backup.lockEnabled);
       if (backup.profileName) setProfileName(backup.profileName);
       setNoticeError(false); setNotice('Backup restored.');
@@ -319,7 +300,6 @@ function App() {
       XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(flattened), key.slice(0, 31));
     }
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ app: 'All In One', version: 1, exportedAt: new Date().toISOString(), profileName }]), 'Backup Info');
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([...cashflowYears.map(year => ({ year, removed: false })), ...removedCashflowYears.map(year => ({ year, removed: true }))]), 'Cash Flow Years');
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(Object.entries(lockEnabled).map(([section, requirePin]) => ({ section, requirePin }))), 'Section Locks');
     XLSX.writeFile(workbook, 'all-in-one-backup.xlsx');
   };
@@ -338,6 +318,7 @@ function App() {
   if (!storageReady) return <div className="storage-status-screen"><div className="brand-icon"><Sparkles size={19} /></div><h1>Opening your records</h1><p>Loading from this device…</p></div>;
 
   return <div className="shell">
+    {mobile && <button className="sidebar-backdrop" aria-label="Close navigation menu" onClick={() => setMobile(false)} />}
     <aside className={`sidebar ${mobile ? 'show' : ''}`}>
       <div className="brand"><div className="brand-icon"><Sparkles size={19} /></div><span><b>All In One</b></span><button className="icon-button mobile-close" onClick={() => setMobile(false)}><X size={18} /></button></div>
       <button className="workspace workspace-profile" onClick={() => setProfileDialogOpen(true)}><div className="avatar">{profileName ? profileName.trim().charAt(0).toUpperCase() : 'P'}</div><div><strong>{profileName || 'Add your name'}</strong></div><Pencil size={15} /></button>
@@ -360,7 +341,7 @@ function App() {
 
         {page === 'Planner' && <div className="planner-grid"><section className="panel"><div className="panel-head"><div><h2>Tasks</h2><p>Track work you want to complete.</p></div><button className="button primary" onClick={() => open('Task')}><Plus size={16} /> Add task</button></div>{plannerTasks.length ? plannerTasks.map(item => <TaskRow key={item.id} item={item} complete={() => completeTask(item.id)} onEdit={() => editRecord('task', item)} onDelete={() => deleteRecord('task', item.id)} />) : <div className="empty-state">No tasks yet.</div>}</section><section className="panel"><div className="panel-head"><div><h2>Events</h2><p>Keep track of dates and occasions.</p></div><button className="button primary" onClick={() => open('Event')}><Plus size={16} /> Add event</button></div>{plannerEvents.length ? plannerEvents.map(item => <TaskRow key={item.id} item={item} complete={() => completeTask(item.id)} onEdit={() => editRecord('task', item)} onDelete={() => deleteRecord('task', item.id)} />) : <div className="empty-state">No events yet.</div>}</section></div>}
 
-        {page === 'Cash flow' && <section className="cashflow"><div className="cashflow-toolbar"><div className="month-year-picker"><label className="month-picker">Month <select value={selectedMonth.slice(5, 7)} onChange={event => setSelectedMonth(`${selectedMonth.slice(0, 4)}-${event.target.value}`)}>{monthLabels.map((label, index) => <option key={label} value={String(index + 1).padStart(2, '0')}>{label}</option>)}</select></label><label className="month-picker">Year <select value={selectedMonth.slice(0, 4)} onChange={event => setSelectedMonth(`${event.target.value}-${selectedMonth.slice(5, 7)}`)}>{visibleCashflowYears.map(year => <option key={year}>{year}</option>)}</select></label><div className="year-actions"><button className="button subtle year-button" onClick={addCashflowYear}><Plus size={14} /> Add year</button><button className="button subtle year-button" title={Number(selectedYear) === currentYear ? 'The current year cannot be removed' : yearHasCashflowData(selectedYear) ? 'This year contains cash-flow data' : 'Remove this year'} disabled={Number(selectedYear) === currentYear || yearHasCashflowData(selectedYear)} onClick={removeCashflowYear}><Trash2 size={14} /> Delete year</button></div></div><div className="cashflow-actions"><button className="button subtle" onClick={() => requireSection(() => open('Income'))}><ArrowDownLeft size={16} /> Add income</button><button className="button primary" onClick={() => requireSection(() => open('Expense'))}><ArrowUpRight size={16} /> Add expense</button></div></div>
+        {page === 'Cash flow' && <section className="cashflow"><div className="cashflow-toolbar"><div className="month-year-picker"><label className="month-picker">Month<select aria-label="Cash flow month" value={selectedMonth.slice(5, 7)} onChange={event => setSelectedMonth(`${selectedMonth.slice(0, 4)}-${event.target.value}`)}>{monthLabels.map((label, index) => <option key={label} value={String(index + 1).padStart(2, '0')}>{label}</option>)}</select></label><label className="month-picker">Year<select aria-label="Cash flow year" value={selectedMonth.slice(0, 4)} onChange={event => setSelectedMonth(`${event.target.value}-${selectedMonth.slice(5, 7)}`)}>{visibleCashflowYears.map(year => <option key={year}>{year}</option>)}</select></label></div><div className="cashflow-actions"><button className="button subtle" onClick={() => requireSection(() => open('Income'))}><ArrowDownLeft size={16} /> Add income</button><button className="button primary" onClick={() => requireSection(() => open('Expense'))}><ArrowUpRight size={16} /> Add expense</button></div></div>
           <section className="stats"><FlowCard title="Monthly income" value={privateMode ? money(income) : '••••••'} subtitle={`${selectedMonth} · Click to view entries`} tone="mint" icon={<ArrowDownLeft />} active={flowFilter === 'income'} onClick={() => setFlowFilter(flowFilter === 'income' ? 'all' : 'income')} /><FlowCard title="Monthly expenses" value={privateMode ? money(expenses) : '••••••'} subtitle={`${selectedMonth} · Click to view entries`} tone="peach" icon={<ArrowUpRight />} active={flowFilter === 'expense'} onClick={() => setFlowFilter(flowFilter === 'expense' ? 'all' : 'expense')} /><FlowCard title="Monthly balance" value={privateMode ? money(income - expenses) : '••••••'} subtitle={selectedMonth} tone="lavender" icon={<Wallet />} active={flowFilter === 'all'} onClick={() => setFlowFilter('all')} /></section>
           <section className="panel full-panel"><div className="panel-head"><div><h2>{flowFilter === 'income' ? 'Income entries' : flowFilter === 'expense' ? 'Expense entries' : 'All transactions'} · {selectedMonth}</h2><p>Monthly entries are included in this month’s totals and balance even while their payments are pending.</p></div></div>{visibleTransactions.length ? visibleTransactions.map(item => <div className="payment-row" key={item.id}><div className={`pay-icon ${item.kind === 'income' ? 'pay-green' : ''}`}>{item.kind === 'income' ? <ArrowDownLeft size={17} /> : <ArrowUpRight size={17} />}</div><div className="pay-info"><strong>{privateMode ? item.title : 'Private entry'}</strong><small>{privateMode ? `${item.date} · ${item.category}${item.entryMode === 'fixed' ? ` · Monthly · ${item.kind === 'expense' ? (item.paid ? 'Paid' : 'Payment pending') : 'Expected income'}` : ''}` : 'Unlock Cash Flow to view details'}</small></div><div className={`pay-amount ${item.kind === 'income' ? 'income' : ''}`}>{privateMode ? `${item.kind === 'income' ? '+' : '−'}${money(item.amount)}` : '••••••'}</div>{privateMode && <RowActions onEdit={() => editCashflow(item)} onDelete={() => deleteRecord(item.entryMode === 'fixed' ? 'recurring' : 'transaction', item.templateId || item.id)} />}</div>) : <div className="empty-state">No entries recorded for {selectedMonth}. Use Add income or Add expense.</div>}</section>
           <section className="panel recurring-panel"><div className="panel-head"><div><h2>Monthly entries</h2><p>Leave duration empty to continue until you edit or pause it.</p></div></div>{data.recurringTemplates.length ? data.recurringTemplates.map(item => { const active = item.periods.some(period => period.startMonth <= selectedMonth && (!period.endMonth || selectedMonth <= period.endMonth)); const change = latestChange(item, selectedMonth); return <div className="payment-row" key={item.id}><div className={`pay-icon ${item.kind === 'income' ? 'pay-green' : ''}`}>{item.kind === 'income' ? <ArrowDownLeft size={17} /> : <ArrowUpRight size={17} />}</div><div className="pay-info"><strong>{privateMode ? (change?.category || item.category) : 'Private monthly entry'}</strong><small>{privateMode ? `${item.kind} · starts ${item.periods[0]?.startMonth} · ${active ? 'Active this month' : 'Not active this month'}` : 'Unlock Cash Flow to view details'}</small></div><div className="pay-amount">{privateMode ? money(change?.amount ?? item.amount) : '••••••'}</div>{privateMode && <><button className="button subtle paid-button" onClick={() => editRecord('recurring', item)}>Edit</button><button className="button subtle paid-button" onClick={() => toggleRecurring(item.id)}>{active ? 'Pause' : 'Resume'}</button><RowActions onDelete={() => deleteRecord('recurring', item.id)} /></>}</div>; }) : <div className="empty-small">No monthly entries yet.</div>}</section>

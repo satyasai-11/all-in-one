@@ -10,19 +10,20 @@
 - Income and expense forms support one-time or monthly entries. A monthly entry can repeat for a chosen number of months or continue until paused/edited; fixed expenses also have a configurable due day that defaults to the 10th.
 - Edit and delete actions are available for planner items, transactions, fixed templates, assets, liabilities, payments, vault entries, and Other Info records. Other Info entries support free-text details and view/copy.
 - Balance Sheet and Personal Vault PIN requirements can be enabled or disabled independently; other sections have no privacy controls.
-- Cash Flow has Month and Year selectors. Years follow the current year, allow adding the next year, and only show past years with cash-flow data; the current year and years with records cannot be deleted.
+- Cash Flow has visible Month and Year selectors. It automatically shows the current year plus the next five years, and only shows past years that have cash-flow data; no manual year management is needed.
 - Planner tasks and events are displayed in separate panels and support due dates, remaining-day labels, and red overdue status. Home lists them separately too.
 - Payments are generated from monthly expenses in Cash Flow. One-time spending such as a purchase stays out of Payments. Monthly income and expenses are included in their month’s totals and balance even while a bill is pending; bills have a month-specific paid status in Payments.
 - Personal Vault entries open in a detail pop-up with a copy-information action.
 - Records are stored in device-local IndexedDB; legacy browser records migrate on first launch. Browser persistent-storage retention is requested when supported.
 - A PWA manifest, app icon, and service worker provide installable app-shell caching for offline launch after the app is first loaded online.
+- The mobile sidebar closes when the user taps outside it, and the selected section is kept across a page refresh in the current tab.
 - JSON and Excel backups include all collections, including Other Info. Older backups without Other Info remain restorable.
 - INR formatting and monthly cash-flow totals kept separate from net worth.
 - Excel and JSON export and validated Excel/JSON restore.
 
 ## Mobile and production boundary
 
-- This is a local-first app with no cloud database or cross-device sync. Mobile installation requires publishing the static build to an HTTPS host. The host serves app files; records stay in each device's IndexedDB.
+- This is a local-first app with no cloud database or cross-device sync. The static build is hosted at https://all-in-one-vibe-code.vercel.app; records stay in each device's IndexedDB.
 - Records and exported backups are readable data; PIN protection gates the UI but does not encrypt records. Store the backup somewhere separate from the phone to recover after loss or replacement. Avoid CVVs, card PINs, OTPs, and banking passwords.
 - IndexedDB may be evicted by the browser if persistent storage is not granted. Regular independent backups are required for recovery.
 - Responsive desktop/mobile navigation.
