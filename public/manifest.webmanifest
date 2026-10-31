@@ -1,0 +1,15 @@
+{
+  "id": "/",
+  "name": "All In One Personal Organizer",
+  "short_name": "All In One",
+  "description": "A personal organizer with records saved on this device.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f5f1",
+  "theme_color": "#455944",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
